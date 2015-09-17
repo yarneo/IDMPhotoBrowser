@@ -8,6 +8,7 @@
 
 #import "IDMPhoto.h"
 #import "IDMPhotoBrowser.h"
+#import "UIImageView+WebCache.h"
 
 // Private
 @interface IDMPhoto () {
@@ -135,28 +136,48 @@ caption = _caption;
             // Load async from file
             [self performSelectorInBackground:@selector(loadImageFromFileAsync) withObject:nil];
         } else if (_photoURL) {
-            // Load async from web (using AFNetworking)
-            NSURLRequest *request = [[NSURLRequest alloc] initWithURL:_photoURL
-                                                          cachePolicy:NSURLRequestReturnCacheDataElseLoad
-                                                      timeoutInterval:0];
-            
-            AFHTTPRequestOperation *op = [[AFHTTPRequestOperation alloc] initWithRequest:request];
-            op.responseSerializer = [AFImageResponseSerializer serializer];
+            SDWebImageManager *manager = [SDWebImageManager sharedManager];
+            [manager downloadImageWithURL:_photoURL
+                                  options:0
+                                 progress:^(NSInteger receivedSize, NSInteger expectedSize) {
+                                     // progression tracking code
+                                     CGFloat progress = ((CGFloat)receivedSize)/((CGFloat)expectedSize);
+                                     if (self.progressUpdateBlock) {
+                                         self.progressUpdateBlock(progress);
+                                     }
 
-            [op setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
-                UIImage *image = responseObject;
-                self.underlyingImage = image;
-                [self performSelectorOnMainThread:@selector(imageLoadingComplete) withObject:nil waitUntilDone:NO];
-            } failure:^(AFHTTPRequestOperation *operation, NSError *error) { }];
-            
-            [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead) {
-                CGFloat progress = ((CGFloat)totalBytesRead)/((CGFloat)totalBytesExpectedToRead);
-                if (self.progressUpdateBlock) {
-                    self.progressUpdateBlock(progress);
-                }
-            }];
-            
-            [[NSOperationQueue mainQueue] addOperation:op];
+                                 }
+                                completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, BOOL finished, NSURL *imageURL) {
+                                    if (error) {
+                                        NSLog(@"Error: %@",error.description);
+                                    }
+                                    else if (image) {
+                                        self.underlyingImage = image;
+                                        [self performSelectorOnMainThread:@selector(imageLoadingComplete) withObject:nil waitUntilDone:NO];
+                                    }
+                                }];
+            // Load async from web (using AFNetworking)
+//            NSURLRequest *request = [[NSURLRequest alloc] initWithURL:_photoURL
+//                                                          cachePolicy:NSURLRequestReturnCacheDataElseLoad
+//                                                      timeoutInterval:0];
+//            
+//            AFHTTPRequestOperation *op = [[AFHTTPRequestOperation alloc] initWithRequest:request];
+//            op.responseSerializer = [AFImageResponseSerializer serializer];
+//
+//            [op setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
+//                UIImage *image = responseObject;
+//                self.underlyingImage = image;
+//                [self performSelectorOnMainThread:@selector(imageLoadingComplete) withObject:nil waitUntilDone:NO];
+//            } failure:^(AFHTTPRequestOperation *operation, NSError *error) { }];
+//            
+//            [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead) {
+//                CGFloat progress = ((CGFloat)totalBytesRead)/((CGFloat)totalBytesExpectedToRead);
+//                if (self.progressUpdateBlock) {
+//                    self.progressUpdateBlock(progress);
+//                }
+//            }];
+//            
+//            [[NSOperationQueue mainQueue] addOperation:op];
         } else {
             // Failed - no source
             self.underlyingImage = nil;

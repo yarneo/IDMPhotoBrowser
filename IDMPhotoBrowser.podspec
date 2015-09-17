@@ -14,4 +14,5 @@ Pod::Spec.new do |s|
   s.dependency       'AFNetworking'
   s.dependency       'DACircularProgress'
   s.dependency       'pop'
+  s.dependency       'SDWebImage'
   end
